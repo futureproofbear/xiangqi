@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>象棋 · Chinese Chess</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&family=Ma+Shan+Zheng&display=swap');
+
+:root {
+  --red: #c0392b;
+  --selected-glow: #f0d060;
+  --bg: #2c1810;
+  --panel-bg: rgba(20,10,5,0.85);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 20% 20%, rgba(180,80,20,0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(120,40,10,0.2) 0%, transparent 60%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Noto Serif SC', serif;
+  padding: 20px;
+  gap: 24px;
+}
+
+h1 {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 28px;
+  color: #d4a054;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  letter-spacing: 6px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.side-panel { width: 160px; display: flex; flex-direction: column; gap: 16px; flex-shrink: 0; }
+
+.player-card {
+  background: var(--panel-bg);
+  border: 1px solid rgba(180,120,40,0.3);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s;
+  border-radius: 12px;
+}
+
+.player-card.red-card::before   { background: radial-gradient(ellipse, rgba(192,57,43,0.15), transparent 70%); }
+.player-card.black-card::before { background: radial-gradient(ellipse, rgba(80,80,80,0.2),   transparent 70%); }
+
+.player-card.active { border-color: var(--selected-glow); box-shadow: 0 0 20px rgba(240,208,96,0.3); }
+.player-card.active::before { opacity: 1; }
+
+.player-char { font-family: 'Ma Shan Zheng', cursive; font-size: 44px; line-height: 1; margin-bottom: 6px; }
+.red-card .player-char   { color: var(--red); text-shadow: 0 2px 12px rgba(192,57,43,0.5); }
+.black-card .player-char { color: #ccc; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+
+.player-label { font-size: 11px; letter-spacing: 3px; color: #7a6040; margin-bottom: 4px; }
+.player-name  { font-size: 13px; color: #c8a060; font-weight: 600; }
+
+.turn-indicator {
+  font-size: 10px; color: var(--selected-glow); letter-spacing: 2px;
+  margin-top: 6px; opacity: 0; transition: opacity 0.3s;
+}
+.player-card.active .turn-indicator { opacity: 1; animation: blink 1.2s ease-in-out infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.captured-pieces {
+  background: var(--panel-bg);
+  border: 1px solid rgba(180,120,40,0.2);
+  border-radius: 10px;
+  padding: 10px;
+  min-height: 80px;
+}
+.captured-label { font-size: 9px; letter-spacing: 2px; color: #5a4020; margin-bottom: 6px; text-align: center; }
+.captured-list  { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.cap-piece { font-family: 'Ma Shan Zheng', cursive; font-size: 14px; opacity: 0.8; }
+.cap-piece.red   { color: var(--red); }
+.cap-piece.black { color: #888; }
+
+.btn {
+  background: linear-gradient(135deg, #8b5e2e, #5c3a18);
+  border: 1px solid rgba(200,160,80,0.4);
+  border-radius: 8px;
+  color: #d4a054;
+  font-family: 'Noto Serif SC', serif;
+  font-size: 13px;
+  padding: 10px;
+  cursor: pointer;
+  letter-spacing: 2px;
+  transition: all 0.2s;
+  width: 100%;
+}
+.btn:hover  { background: linear-gradient(135deg, #a06e36, #7a4e22); box-shadow: 0 2px 12px rgba(200,160,80,0.3); }
+.btn:active { transform: scale(0.97); }
+
+.status-banner {
+  background: var(--panel-bg);
+  border: 1px solid rgba(240,208,96,0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: #d4a054;
+  text-align: center;
+  letter-spacing: 1px;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.board-wrap { display: flex; flex-direction: column; align-items: center; }
+
+#board {
+  position: relative;
+  border: 6px solid #b8945a;
+  box-shadow: 0 0 0 2px #8b5e2e, 0 0 0 4px #5c3a18, 0 8px 40px rgba(0,0,0,0.7);
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+canvas#boardCanvas { display: block; }
+
+.winner-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 50;
+  align-items: center;
+  justify-content: center;
+}
+.winner-overlay.show { display: flex; }
+
+.winner-box {
+  background: linear-gradient(135deg, #3a1e08, #1a0c04);
+  border: 2px solid rgba(220,180,80,0.6);
+  border-radius: 20px;
+  padding: 40px 60px;
+  text-align: center;
+  box-shadow: 0 0 60px rgba(220,180,80,0.2);
+}
+
+.winner-char {
+  font-family: 'Ma Shan Zheng', cursive;
+  font-size: 80px; line-height: 1; margin-bottom: 10px;
+  animation: winPulse 1s ease-in-out infinite;
+}
+.winner-char.red   { color: var(--red); text-shadow: 0 0 30px rgba(192,57,43,0.7); }
+.winner-char.black { color: #ccc;       text-shadow: 0 0 30px rgba(150,150,150,0.5); }
+@keyframes winPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+
+.winner-text { font-size: 18px; color: #d4a054; letter-spacing: 4px; margin-bottom: 6px; }
+.winner-sub  { font-size: 13px; color: #7a6040; letter-spacing: 2px; margin-bottom: 24px; }
+
+.guide-box { background: var(--panel-bg); border: 1px solid rgba(180,120,40,0.2); border-radius: 10px; padding: 12px; }
+.guide-title   { font-size: 9px; letter-spacing: 2px; color: #5a4020; margin-bottom: 8px; text-align: center; }
+.guide-content { font-size: 10px; color: #7a6040; line-height: 1.9; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+
+<!-- Left Panel: Black player -->
+<div class="side-panel">
+  <div style="text-align:center">
+    <h1>象棋</h1>
+    <div style="font-size:11px;color:#5a4020;letter-spacing:3px;">CHINESE CHESS</div>
+  </div>
+
+  <div class="player-card black-card" id="blackCard">
+    <div class="player-char">將</div>
+    <div class="player-label">PLAYER 2</div>
+    <div class="player-name">黑方</div>
+    <div class="turn-indicator">YOUR TURN</div>
+  </div>
+
+  <div class="captured-pieces">
+    <div class="captured-label">CAPTURED BY BLACK</div>
+    <div class="captured-list" id="blackCapturedList"></div>
+  </div>
+
+  <div class="status-banner" id="statusBanner">Click a piece to begin</div>
+  <button class="btn" onclick="newGame()">新局 · NEW GAME</button>
+</div>
+
+<!-- Board -->
+<div class="board-wrap">
+  <div id="board">
+    <canvas id="boardCanvas"></canvas>
+  </div>
+</div>
+
+<!-- Right Panel: Red player -->
+<div class="side-panel">
+  <div style="height:60px"></div>
+
+  <div class="player-card red-card active" id="redCard">
+    <div class="player-char">帥</div>
+    <div class="player-label">PLAYER 1</div>
+    <div class="player-name">紅方</div>
+    <div class="turn-indicator">YOUR TURN</div>
+  </div>
+
+  <div class="captured-pieces">
+    <div class="captured-label">CAPTURED BY RED</div>
+    <div class="captured-list" id="redCapturedList"></div>
+  </div>
+
+  <div class="guide-box">
+    <div class="guide-title">PIECES GUIDE</div>
+    <div class="guide-content">
+      帥/將 King<br>
+      仕/士 Advisor<br>
+      相/象 Elephant<br>
+      傌/馬 Horse<br>
+      俥/車 Chariot<br>
+      炮/砲 Cannon<br>
+      兵/卒 Pawn
+    </div>
+  </div>
+</div>
+
+<!-- Winner overlay -->
+<div class="winner-overlay" id="winnerOverlay">
+  <div class="winner-box">
+    <div class="winner-char red" id="winnerChar">帥</div>
+    <div class="winner-text"    id="winnerText">RED WINS!</div>
+    <div class="winner-sub">將軍勝利</div>
+    <button class="btn" onclick="newGame()">再來一局 · PLAY AGAIN</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('boardCanvas');
+const ctx    = canvas.getContext('2d');
+
+const COLS = 9, ROWS = 10;
+const CELL = 62;
+const PAD  = 44;
+const CW   = CELL * (COLS - 1) + PAD * 2;
+const CH   = CELL * (ROWS - 1) + PAD * 2;
+canvas.width  = CW;
+canvas.height = CH;
+
+const RED_CHARS   = { K:'帥', A:'仕', E:'相', H:'傌', R:'俥', C:'炮', P:'兵' };
+const BLACK_CHARS = { K:'將', A:'士', E:'象', H:'馬', R:'車', C:'砲', P:'卒' };
+
+let board, selected, currentTurn, capturedByRed, capturedByBlack, gameOver;
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+function initBoard() {
+  board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+
+  // Black (top)
+  ['R','H','E','A','K','A','E','H','R'].forEach((t, c) => board[0][c] = { type:t, side:'black' });
+  board[2][1] = { type:'C', side:'black' };
+  board[2][7] = { type:'C', side:'black' };
+  for (let c = 0; c < 9; c += 2) board[3][c] = { type:'P', side:'black' };
+
+  // Red (bottom)
+  ['R','H','E','A','K','A','E','H','R'].forEach((t, c) => board[9][c] = { type:t, side:'red' });
+  board[7][1] = { type:'C', side:'red' };
+  board[7][7] = { type:'C', side:'red' };
+  for (let c = 0; c < 9; c += 2) board[6][c] = { type:'P', side:'red' };
+
+  selected        = null;
+  currentTurn     = 'red';
+  capturedByRed   = [];
+  capturedByBlack = [];
+  gameOver        = false;
+
+  document.getElementById('winnerOverlay').classList.remove('show');
+  updateUI();
+  render();
+}
+
+// ─── RULES ──────────────────────────────────────────────────────────────────
+function inBounds(r, c) { return r >= 0 && r < ROWS && c >= 0 && c < COLS; }
+
+function inPalace(r, c, side) {
+  return side === 'red'
+    ? (r >= 7 && r <= 9 && c >= 3 && c <= 5)
+    : (r >= 0 && r <= 2 && c >= 3 && c <= 5);
+}
+
+function getValidMoves(r, c) {
+  const piece = board[r][c];
+  if (!piece) return [];
+  const { type, side } = piece;
+  const enemy = side === 'red' ? 'black' : 'red';
+  const moves = [];
+
+  const add = (tr, tc) => {
+    if (!inBounds(tr, tc)) return;
+    if (board[tr][tc] && board[tr][tc].side === side) return;
+    moves.push([tr, tc]);
+  };
+
+  const DIRS4  = [[1,0],[-1,0],[0,1],[0,-1]];
+  const DIAGS4 = [[1,1],[1,-1],[-1,1],[-1,-1]];
+
+  if (type === 'K') {
+    for (const [dr, dc] of DIRS4) {
+      const nr = r + dr, nc = c + dc;
+      if (inBounds(nr, nc) && inPalace(nr, nc, side)) add(nr, nc);
+    }
+  }
+
+  else if (type === 'A') {
+    for (const [dr, dc] of DIAGS4) {
+      const nr = r + dr, nc = c + dc;
+      if (inBounds(nr, nc) && inPalace(nr, nc, side)) add(nr, nc);
+    }
+  }
+
+  else if (type === 'E') {
+    // 2 diagonal steps; leg (midpoint) must be clear; cannot cross river
+    for (const [dr, dc] of DIAGS4) {
+      const nr = r + dr * 2, nc = c + dc * 2;
+      const mr = r + dr,     mc = c + dc;
+      if (!inBounds(nr, nc)) continue;
+      if (board[mr][mc]) continue;                   // blocked
+      if (side === 'red'   && nr < 5) continue;      // no river crossing
+      if (side === 'black' && nr > 4) continue;
+      add(nr, nc);
+    }
+  }
+
+  else if (type === 'H') {
+    // 1 orthogonal + 1 diagonal; first step (leg) must be clear
+    for (const [dr, dc] of DIRS4) {
+      const lr = r + dr, lc = c + dc;
+      if (!inBounds(lr, lc) || board[lr][lc]) continue;
+      if (dr === 0) {
+        // moved horizontally → branch vertically
+        add(r + 1, c + dc * 2);
+        add(r - 1, c + dc * 2);
+      } else {
+        // moved vertically → branch horizontally
+        add(r + dr * 2, c + 1);
+        add(r + dr * 2, c - 1);
+      }
+    }
+  }
+
+  else if (type === 'R') {
+    for (const [dr, dc] of DIRS4) {
+      let nr = r + dr, nc = c + dc;
+      while (inBounds(nr, nc)) {
+        if (board[nr][nc]) {
+          if (board[nr][nc].side === enemy) moves.push([nr, nc]);
+          break;
+        }
+        moves.push([nr, nc]);
+        nr += dr; nc += dc;
+      }
+    }
+  }
+
+  else if (type === 'C') {
+    for (const [dr, dc] of DIRS4) {
+      let nr = r + dr, nc = c + dc, screen = false;
+      while (inBounds(nr, nc)) {
+        if (!screen) {
+          if (board[nr][nc]) screen = true;
+          else moves.push([nr, nc]);
+        } else {
+          if (board[nr][nc]) {
+            if (board[nr][nc].side === enemy) moves.push([nr, nc]);
+            break;
+          }
+        }
+        nr += dr; nc += dc;
+      }
+    }
+  }
+
+  else if (type === 'P') {
+    if (side === 'red') {
+      add(r - 1, c);
+      if (r <= 4) { add(r, c - 1); add(r, c + 1); }
+    } else {
+      add(r + 1, c);
+      if (r >= 5) { add(r, c - 1); add(r, c + 1); }
+    }
+  }
+
+  return moves;
+}
+
+// ─── DRAWING ────────────────────────────────────────────────────────────────
+function px(c) { return PAD + c * CELL; }
+function py(r) { return PAD + r * CELL; }
+
+function drawCornerMarks(r, c) {
+  const x = px(c), y = py(r), s = 5, g = 3;
+  ctx.strokeStyle = '#6a4820';
+  ctx.lineWidth   = 1.5;
+
+  const left  = c > 0,        right = c < COLS - 1;
+  const up    = r > 0,        down  = r < ROWS - 1;
+
+  if (left  && up)   { ctx.beginPath(); ctx.moveTo(x-g-s, y-g); ctx.lineTo(x-g, y-g); ctx.lineTo(x-g, y-g-s); ctx.stroke(); }
+  if (right && up)   { ctx.beginPath(); ctx.moveTo(x+g+s, y-g); ctx.lineTo(x+g, y-g); ctx.lineTo(x+g, y-g-s); ctx.stroke(); }
+  if (left  && down) { ctx.beginPath(); ctx.moveTo(x-g-s, y+g); ctx.lineTo(x-g, y+g); ctx.lineTo(x-g, y+g+s); ctx.stroke(); }
+  if (right && down) { ctx.beginPath(); ctx.moveTo(x+g+s, y+g); ctx.lineTo(x+g, y+g); ctx.lineTo(x+g, y+g+s); ctx.stroke(); }
+}
+
+function drawBoard() {
+  // Wooden background
+  const grad = ctx.createLinearGradient(0, 0, CW, CH);
+  grad.addColorStop(0,   '#d4aa6e');
+  grad.addColorStop(0.5, '#c8a060');
+  grad.addColorStop(1,   '#b89050');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, CW, CH);
+
+  ctx.strokeStyle = '#6a4820';
+  ctx.lineWidth   = 1.5;
+
+  // Horizontal lines (all full-width)
+  for (let r = 0; r < ROWS; r++) {
+    ctx.beginPath();
+    ctx.moveTo(px(0), py(r));
+    ctx.lineTo(px(COLS - 1), py(r));
+    ctx.stroke();
+  }
+
+  // Vertical lines: edge columns unbroken; inner columns split at river
+  for (let c = 0; c < COLS; c++) {
+    if (c === 0 || c === COLS - 1) {
+      ctx.beginPath();
+      ctx.moveTo(px(c), py(0));
+      ctx.lineTo(px(c), py(ROWS - 1));
+      ctx.stroke();
+    } else {
+      // Top half (rows 0-4)
+      ctx.beginPath();
+      ctx.moveTo(px(c), py(0));
+      ctx.lineTo(px(c), py(4));
+      ctx.stroke();
+      // Bottom half (rows 5-9)
+      ctx.beginPath();
+      ctx.moveTo(px(c), py(5));
+      ctx.lineTo(px(c), py(ROWS - 1));
+      ctx.stroke();
+    }
+  }
+
+  // River highlight
+  ctx.fillStyle = 'rgba(80,120,200,0.07)';
+  ctx.fillRect(px(0), py(4), px(8) - px(0), CELL);
+
+  ctx.fillStyle    = '#7a5a20';
+  ctx.font         = 'bold 17px "Noto Serif SC", serif';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('楚 河', (px(0) + px(4)) / 2, py(4) + CELL / 2);
+  ctx.fillText('漢 界', (px(4) + px(8)) / 2, py(4) + CELL / 2);
+
+  // Palace diagonals
+  ctx.strokeStyle = '#6a4820';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath(); ctx.moveTo(px(3), py(0)); ctx.lineTo(px(5), py(2)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(5), py(0)); ctx.lineTo(px(3), py(2)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(3), py(7)); ctx.lineTo(px(5), py(9)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(5), py(7)); ctx.lineTo(px(3), py(9)); ctx.stroke();
+
+  // Corner bracket markers at key positions
+  const markers = [
+    [2,1],[2,7],[7,1],[7,7],
+    [3,0],[3,2],[3,4],[3,6],[3,8],
+    [6,0],[6,2],[6,4],[6,6],[6,8],
+  ];
+  for (const [r, c] of markers) drawCornerMarks(r, c);
+}
+
+function drawValidMoves(moves) {
+  for (const [r, c] of moves) {
+    if (board[r][c]) {
+      ctx.strokeStyle = 'rgba(240,200,50,0.85)';
+      ctx.lineWidth   = 3;
+      ctx.beginPath();
+      ctx.arc(px(c), py(r), CELL * 0.39, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(240,200,50,0.6)';
+      ctx.beginPath();
+      ctx.arc(px(c), py(r), 7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawPiece(r, c, highlighted) {
+  const piece = board[r][c];
+  if (!piece) return;
+  const { type, side } = piece;
+  const x = px(c), y = py(r);
+  const rad = CELL * 0.41;
+
+  ctx.shadowColor   = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur    = highlighted ? 14 : 7;
+  ctx.shadowOffsetY = 2;
+
+  // Outer ring
+  ctx.fillStyle = side === 'red' ? '#7a1010' : '#111111';
+  ctx.beginPath();
+  ctx.arc(x, y, rad, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner ivory face
+  const fg = ctx.createRadialGradient(x - rad * 0.22, y - rad * 0.22, rad * 0.05, x, y, rad * 0.85);
+  fg.addColorStop(0, '#faf2dc');
+  fg.addColorStop(1, '#e5d4a8');
+  ctx.fillStyle = fg;
+  ctx.beginPath();
+  ctx.arc(x, y, rad * 0.84, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+  // Decorative inner ring
+  ctx.strokeStyle = side === 'red' ? 'rgba(160,20,20,0.55)' : 'rgba(20,20,20,0.45)';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, rad * 0.72, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Character
+  const ch = side === 'red' ? RED_CHARS[type] : BLACK_CHARS[type];
+  ctx.fillStyle    = side === 'red' ? '#b52020' : '#111';
+  ctx.font         = `bold ${Math.round(rad * 1.12)}px "Ma Shan Zheng", serif`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ch, x, y + 1);
+
+  // Selection glow
+  if (highlighted) {
+    ctx.strokeStyle = '#f0d060';
+    ctx.lineWidth   = 3;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(240,208,96,0.35)';
+    ctx.lineWidth   = 7;
+    ctx.beginPath();
+    ctx.arc(x, y, rad + 9, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function render() {
+  drawBoard();
+
+  if (selected) {
+    const [sr, sc] = selected;
+    drawValidMoves(getValidMoves(sr, sc));
+  }
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c]) {
+        drawPiece(r, c, selected && selected[0] === r && selected[1] === c);
+      }
+    }
+  }
+}
+
+// ─── INTERACTION ─────────────────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  if (gameOver) return;
+
+  const rect   = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const gc = Math.round(((e.clientX - rect.left) * scaleX - PAD) / CELL);
+  const gr = Math.round(((e.clientY - rect.top)  * scaleY - PAD) / CELL);
+
+  if (!inBounds(gr, gc)) return;
+
+  if (selected) {
+    const [sr, sc] = selected;
+    const valid = getValidMoves(sr, sc).some(([mr, mc]) => mr === gr && mc === gc);
+
+    if (valid) {
+      movePiece(sr, sc, gr, gc);
+      selected = null;
+    } else if (board[gr][gc] && board[gr][gc].side === currentTurn) {
+      selected = [gr, gc];
+    } else {
+      selected = null;
+    }
+  } else {
+    if (board[gr][gc] && board[gr][gc].side === currentTurn) {
+      selected = [gr, gc];
+    }
+  }
+  render();
+});
+
+function movePiece(fr, fc, tr, tc) {
+  const captured = board[tr][tc];
+
+  if (captured) {
+    if (currentTurn === 'red') capturedByRed.push(captured);
+    else capturedByBlack.push(captured);
+
+    if (captured.type === 'K') {
+      board[tr][tc] = board[fr][fc];
+      board[fr][fc] = null;
+      render();
+      setTimeout(() => endGame(currentTurn), 150);
+      return;
+    }
+  }
+
+  board[tr][tc] = board[fr][fc];
+  board[fr][fc] = null;
+  currentTurn   = currentTurn === 'red' ? 'black' : 'red';
+  updateUI();
+}
+
+function endGame(winner) {
+  gameOver = true;
+  document.getElementById('winnerChar').textContent = winner === 'red' ? '帥' : '將';
+  document.getElementById('winnerChar').className   = 'winner-char ' + winner;
+  document.getElementById('winnerText').textContent = winner === 'red' ? 'RED WINS!' : 'BLACK WINS!';
+  document.getElementById('winnerOverlay').classList.add('show');
+}
+
+function updateUI() {
+  document.getElementById('redCard').classList.toggle('active',   currentTurn === 'red');
+  document.getElementById('blackCard').classList.toggle('active', currentTurn === 'black');
+  document.getElementById('statusBanner').textContent =
+    currentTurn === 'red' ? '紅方行棋 · Red to move' : '黑方行棋 · Black to move';
+
+  document.getElementById('redCapturedList').innerHTML =
+    capturedByRed.map(p => `<span class="cap-piece black">${BLACK_CHARS[p.type]}</span>`).join('');
+  document.getElementById('blackCapturedList').innerHTML =
+    capturedByBlack.map(p => `<span class="cap-piece red">${RED_CHARS[p.type]}</span>`).join('');
+}
+
+function newGame() { initBoard(); }
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { selected = null; render(); }
+});
+
+initBoard();
+</script>
+</body>
+</html>
